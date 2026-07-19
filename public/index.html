@@ -33,105 +33,122 @@
         <h3>2. Devices & Assignments</h3>
         <div id="devices-list">Loading devices...</div>
     </div>
-
-    <script>
-        // Global storage for users to easily reference them
+<script>
         let globalUsers = [];
 
-        // Fetch data when page loads
         async function init() {
             await loadUsers();
             await loadDevices();
         }
 
-        // Fetch users and populate global array
         async function loadUsers() {
-            const res = await fetch('/api/users');
-            globalUsers = await res.json();
+            try {
+                const res = await fetch('/api/users');
+                const data = await res.json();
+                if (res.ok) {
+                    globalUsers = data;
+                } else {
+                    console.error("Failed to load users:", data.error);
+                }
+            } catch (err) {
+                console.error("Network error fetching users:", err);
+            }
         }
 
-        // Create a user and reload list
         async function createUser() {
             const nameInput = document.getElementById('new-user-name');
             const name = nameInput.value.trim();
             if (!name) return alert('Please enter a name');
 
-            const res = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
-            });
-
-            if (res.ok) {
-                nameInput.value = '';
-                await init(); // Refresh everything
-                alert('User created successfully!');
-            } else {
-                alert('Failed to create user');
-            }
-        }
-
-        // Fetch devices and render them with custom user dropdowns
-        async function loadDevices() {
-            const res = await fetch('/api/devices');
-            const devices = await res.json();
-            const listContainer = document.getElementById('devices-list');
-            
-            if (devices.length === 0) {
-                listContainer.innerHTML = '<p>No devices registered yet. Have your ESP32 ping the <code>/api/devices/register</code> endpoint!</p>';
-                return;
-            }
-
-            listContainer.innerHTML = '';
-            devices.forEach(device => {
-                const item = document.createElement('div');
-                item.className = 'device-item';
-
-                // Determine who is currently assigned
-                const currentUserId = device.assignedUser ? device.assignedUser._id : '';
-
-                // Build custom dropdown list for this specific device
-                let dropdownOptions = `<option value="">-- Unassigned --</option>`;
-                globalUsers.forEach(user => {
-                    const selected = user._id === currentUserId ? 'selected' : '';
-                    dropdownOptions += `<option value="${user._id}" ${selected}>${user.name}</option>`;
+            try {
+                const res = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
                 });
 
-                item.innerHTML = `
-                    <div>
-                        <strong>${device.deviceName}</strong> <small>(${device.macAddress})</small>
-                    </div>
-                    <div>
-                        <select id="select-${device._id}">
-                            ${dropdownOptions}
-                        </select>
-                        <button onclick="saveAssignment('${device._id}')">Save</button>
-                    </div>
-                `;
-                listContainer.appendChild(item);
-            });
+                const data = await res.json();
+
+                if (res.ok) {
+                    nameInput.value = '';
+                    alert('User created successfully!');
+                    await init(); 
+                } else {
+                    alert('Server error creating user: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Network error creating user: ' + err.message);
+            }
         }
 
-        // Send the updated dropdown value to the API backend
+        async function loadDevices() {
+            const listContainer = document.getElementById('devices-list');
+            try {
+                const res = await fetch('/api/devices');
+                const devices = await res.json();
+                
+                // SAFETY CHECK: If the server returned an error object instead of an array
+                if (!Array.isArray(devices)) {
+                    listContainer.innerHTML = `<p style="color:red;"><strong>Backend Error:</strong> ${devices.error || JSON.stringify(devices)}</p>`;
+                    return;
+                }
+                
+                if (devices.length === 0) {
+                    listContainer.innerHTML = '<p>No devices registered yet. Have your ESP32 ping the <code>/api/devices/register</code> endpoint!</p>';
+                    return;
+                }
+
+                listContainer.innerHTML = '';
+                devices.forEach(device => {
+                    const item = document.createElement('div');
+                    item.className = 'device-item';
+                    const currentUserId = device.assignedUser ? device.assignedUser._id : '';
+
+                    let dropdownOptions = `<option value="">-- Unassigned --</option>`;
+                    globalUsers.forEach(user => {
+                        const selected = user._id === currentUserId ? 'selected' : '';
+                        dropdownOptions += `<option value="${user._id}" ${selected}>${user.name}</option>`;
+                    });
+
+                    item.innerHTML = `
+                        <div>
+                            <strong>${device.deviceName}</strong> <small>(${device.macAddress})</small>
+                        </div>
+                        <div>
+                            <select id="select-${device._id}">${dropdownOptions}</select>
+                            <button onclick="saveAssignment('${device._id}')">Save</button>
+                        </div>
+                    `;
+                    listContainer.appendChild(item);
+                });
+            } catch (err) {
+                listContainer.innerHTML = `<p style="color:red;"><strong>Network Error:</strong> ${err.message}</p>`;
+            }
+        }
+
         async function saveAssignment(deviceId) {
             const selectEl = document.getElementById(`select-${deviceId}`);
             const userId = selectEl.value;
 
-            const res = await fetch('/api/devices/assign', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ deviceId, userId })
-            });
+            try {
+                const res = await fetch('/api/devices/assign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId, userId })
+                });
 
-            if (res.ok) {
-                alert('Assignment updated successfully!');
-                await init();
-            } else {
-                alert('Failed to save assignment.');
+                if (res.ok) {
+                    alert('Assignment updated successfully!');
+                    await init();
+                } else {
+                    const data = await res.json();
+                    alert('Failed to save assignment: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Network error saving assignment: ' + err.message);
             }
         }
 
-        // Boot everything up
         init();
     </script>
 </body>
