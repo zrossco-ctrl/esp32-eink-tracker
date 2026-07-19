@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Ink Tracker Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>E-Ink Tracker Device Management</h1>
+    
+    <div class="card">
+        <h3>Assign User to Device</h3>
+        <label for="user-select">Select User: </label>
+        <select id="user-select">
+            <option value="">-- Unassigned --</option>
+        </select>
+        <button onclick="saveAssignment()">Save Assignment</button>
+    </div>
+
+    <script>
+        // Automatically fetch users when the page opens
+        async function loadUsers() {
+            const res = await fetch('/api/users');
+            const users = await res.json();
+            const select = document.getElementById('user-select');
+            users.forEach(user => {
+                const opt = document.createElement('option');
+                opt.value = user._id;
+                opt.textContent = user.name;
+                select.appendChild(opt);
+            });
+        }
+        loadUsers();
+    </script>
+</body>
+</html>
